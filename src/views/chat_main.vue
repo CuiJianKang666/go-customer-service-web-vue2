@@ -1,0 +1,1341 @@
+<!--<meta charset="utf-8">-->
+<!--<meta name="description" content="">-->
+<!--<meta name="author" content="">-->
+<!--<title>应急智能客服系统</title>-->
+<!--<link rel="stylesheet" href="https://cdn.staticfile.org/element-ui/2.15.1/theme-chalk/index.min.css">-->
+<!--<script src="https://cdn.staticfile.org/vue/2.6.9/vue.min.js"></script>-->
+<!--<script src="https://cdn.staticfile.org/element-ui/2.15.1/index.js"></script>-->
+<!--<script src="https://cdn.staticfile.org/jquery/3.6.0/jquery.min.js"></script>-->
+<!--<link rel="stylesheet" href="/public/static/css/common.css?v=dgftr65ujhfg">-->
+<!--<script src="/public/static/js/functions.js"></script>-->
+<!--<script src="/public/static/js/reconnecting-websocket.min.js"></script>-->
+<!--<link rel="stylesheet" href="/public/static/css/icon/iconfont.css?v=fgjlgfda"/>-->
+<style>
+@import "/public/static/css/common.css?v=dgftr65ujhfg";
+@import "/public/static/css/icon/iconfont.css?v=fgjlgfda";
+@import "https://cdn.staticfile.org/element-ui/2.15.1/theme-chalk/index.min.css";
+
+html, body {
+  overflow: hidden;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background-color: #f5f5f5;
+}
+
+.el-row {
+  width: 100%
+}
+
+.chatLeft {
+  height: 100%;
+  margin-left: 4px;
+  overflow: auto;
+}
+
+.chatBgContext .el-row {
+  margin-bottom: 5px;
+}
+
+.chatBgContext {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.chatUser {
+  line-height: 24px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: #999;
+}
+
+.chatBoxMe .el-col-3 {
+  float: right;
+  text-align: right;
+}
+
+.chatBoxMe .chatUser {
+  text-align: right
+}
+
+.chatBox {
+  width: 100%;
+  height: calc(100% - 220px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.chatTime {
+  text-align: center;
+  color: #bbb;
+  margin: 5px 0;
+  font-size: 12px;
+}
+
+.custom-height {
+  height: 100%;
+}
+</style>
+
+<template>
+  <div id="app" class="chatMainPage">
+    <el-row class="custom-height">
+      <el-col :span="5" class="custom-height">
+        <div class="chatBg chatLeft">
+          <el-tabs v-model="leftTabActive" @tab-click="handleTabClick">
+            <el-tab-pane label="在线用户" name="first">
+              <el-row v-for="item in users" :key="item.uid" class="">
+                <div :title="item.last_message" style="cursor:pointer" class="onlineUsers hasLastMsg"
+                     v-bind:class="{'cur': item.uid==currentGuest }"
+                     v-on:click="talkTo(item.uid,item.username)">
+                  <el-col :span="4">
+                    <el-badge value="new" :hidden="item.hidden_new_message" class="item">
+                      <el-avatar :size="40" :src="item.avator"></el-avatar>
+                    </el-badge>
+                  </el-col>
+                  <el-col :span="16">
+                    <div style="height:20px;overflow: hidden">{{ item.username }}</div>
+                    <div class="lastNewMsg">{{ item.last_message }}</div>
+                  </el-col>
+                </div>
+              </el-row>
+            </el-tab-pane>
+            <el-tab-pane label="已接访客" name="second">
+              <el-row v-for="item in visitors" :key="item.uid" class="">
+                <div style="cursor:pointer" class="onlineUsers"
+                     v-bind:class="{'cur': item.visitor_id==currentGuest }"
+                     v-on:click="talkTo(item.visitor_id,item.name)">
+                  <el-col :span="4">
+                    <el-avatar v-bind:class="{'imgGray': item.status==0 }" :size="40"
+                               :src="item.avator"></el-avatar>
+                  </el-col>
+                  <el-col style="height:40px;overflow: hidden" :span="16"
+                          v-bind:class="{'imgGray': item.status==0 }">
+                    {{ item.name }}
+                  </el-col>
+                </div>
+              </el-row>
+              <el-pagination
+                  v-show="visitorCount>visitorPageSize"
+                  background
+                  @current-change="visitorPage"
+                  :current-page="visitorCurrentPage"
+                  layout="prev,pager, next"
+                  :page-size="visitorPageSize"
+                  :total="visitorCount">
+              </el-pagination>
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+      </el-col>
+      <el-col :span="13" class="custom-height">
+        <div class="kefuMainBg chatBgContext">
+          <el-alert
+              :closable="false"
+              :type="chatTitleType"
+              show-icon
+              :title="chatTitle+chatInputing"
+          >
+          </el-alert>
+          <div class="kefuFuncBtns" v-if="visitor.visitor_id">
+            <!--                        <div class="kefuFuncBtns" v-if="visitor.visitor_id" style="display: none">-->
+            <el-button v-on:click="getMesssagesByVisitorId(visitor.visitor_id,true)" size="small"
+                       type="success" plain icon="el-icon-user">加载全部
+            </el-button>
+            <el-button v-on:click="transKefu" size="small" type="success" plain icon="el-icon-position">
+              转接
+            </el-button>
+            <el-button v-on:click="closeVisitor(visitor.visitor_id)" size="small" type="success" plain
+                       icon="el-icon-close">结束
+            </el-button>
+          </div>
+          <div class="chatBox">
+            <div style="text-align: center;" v-on:click="getHistoryMessage" v-show="showLoadMore">
+              <a href="javascript:;" class="chatNoticeContent"
+                 style="color: #07a9fe;">点击加载更多记录</a>
+            </div>
+            <el-row :gutter="2" v-for="v in msgList" v-bind:class="{'chatBoxMe': v.is_kefu==true}">
+              <div class="chatTime">{{ v.time }}</div>
+              <div class="chatRow">
+                <el-avatar v-if="v.is_kefu==false" class="chatRowAvator" :size="48"
+                           :src="v.avator"></el-avatar>
+                <div class="chatMsgContent">
+                  <div class="chatUser">{{ v.name }}</div>
+                  <div class="chatContent" v-html="v.content"></div>
+                </div>
+                <el-avatar v-if="v.is_kefu==true" class="chatRowAvator" :size="48"
+                           :src="v.avator"></el-avatar>
+              </div>
+            </el-row>
+          </div>
+          <div class="kefuFuncBox">
+            <div class="iconBtnsBox">
+
+              <div class="faceBox kefuFaceBox" v-show="showFaceIcon">
+                <ul class="faceBoxList">
+                  <li v-on:click="faceIconClick(i)" class="faceIcon" v-for="(v,i) in face"
+                      :title="v.name"><img :src=v.path></li>
+                </ul>
+                <div class="clear"></div>
+              </div>
+              <el-tooltip content="发送表情" placement="top">
+                <div class="iconBtn iconfont icon-xiaolian" style="font-size: 24px;"
+                     @click.stop="showFaceIcon==true?showFaceIcon=false:showFaceIcon=true"></div>
+              </el-tooltip>
+
+              <el-tooltip content="上传图片" placement="top">
+                <div class="iconBtn el-icon-picture" id="uploadImg" v-on:click="uploadImg('/uploadimg')"
+                     style="font-size: 24px;"></div>
+              </el-tooltip>
+              <el-tooltip content="上传附件" placement="top">
+                <div class="iconBtn el-icon-upload" id="uploadFile"
+                     v-on:click="uploadFile('/uploadfile')" style="font-size: 26px;"></div>
+              </el-tooltip>
+
+            </div>
+            <div class="clear"></div>
+            <el-button class="kefuSendBtn" :disabled="sendDisabled" size="mini" type="primary"
+                       v-on:click="chatToUser">发送
+            </el-button>
+            <el-input type="textarea" :autosize="{ minRows: 8, maxRows: 12}" class="chatArea"
+                      v-model="messageContent" v-on:keyup.enter.native="chatToUser"
+                      placeholder="请输入内容"></el-input>
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="6" class="chatRight custom-height">
+        <div class="chatBg">
+          <el-tabs v-model="rightTabActive" @tab-click="handleTabClick">
+            <el-tab-pane label="访客信息" name="visitorInfo">
+              <el-menu class="visitorInfo" v-show="visitor.visitor_id">
+                <el-tooltip content="点击加入黑名单" placement="left">
+                  <el-menu-item v-on:click="addIpblack(visitor.source_ip)" title="点击加入黑名单"
+                                style="padding-left:2px;color: #666;">
+                    <i class="el-icon-user"></i>
+                    <span slot="title">IP地址：{{ visitor.source_ip }}</span>
+                  </el-menu-item>
+                </el-tooltip>
+                <el-menu-item v-on:click="openUrl('https://www.baidu.com/s?wd='+visitor.client_ip)"
+                              style="padding-left:2px;color: #666;">
+                  <i class="el-icon-map-location"></i>
+                  <span slot="title">城市：{{ visitor.city }}</span>
+                </el-menu-item>
+                <el-menu-item style="padding-left:2px;color: #666;">
+                  <i class="el-icon-time"></i>
+                  <span slot="title">首次访问：{{ visitor.created_at }}</span>
+                </el-menu-item>
+                <el-menu-item style="padding-left:2px;color: #666;">
+                  <i class="el-icon-time"></i>
+                  <span slot="title">最后访问：{{ visitor.updated_at }}</span>
+                </el-menu-item>
+                <el-tooltip :content="visitor.refer" placement="left">
+                  <el-menu-item style="padding-left:2px;color: #666;">
+                    <i class="el-icon-guide"></i>
+                    <span slot="title">来源标题：{{ visitor.refer }}</span>
+                  </el-menu-item>
+                </el-tooltip>
+                <el-tooltip v-for="v in visitorExtra" :content="v.val" placement="left">
+                  <el-menu-item style="padding-left:2px;color: #666;">
+                    <i class="el-icon-paperclip"></i>
+                    <span slot="title">{{ v.key }}：{{ v.val }}</span>
+                  </el-menu-item>
+                </el-tooltip>
+              </el-menu>
+            </el-tab-pane>
+            <el-tab-pane label="黑名单" name="blackList">
+              <el-row v-for="item in ipBlacks" :key="item.id" class="">
+                <el-tooltip content="点击删除黑名单" placement="left">
+                  <div v-on:click="delIpblack(item.ip)" style="cursor:pointer"
+                       class="onlineUsers imgGray">
+                    {{ item.ip }}
+                  </div>
+                </el-tooltip>
+              </el-row>
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+        <div class="replyBox">
+          <div class="chatRightTitle">快捷回复
+            <a href="javascript:void(0);" @click="replyGroupDialog = true">+添加分组</a>
+          </div>
+          <el-input placeholder="选中文字自动搜索" v-model="replySearch" class="replySearch"
+                    @keyup.enter="searchReply">
+            <el-button slot="append" icon="el-icon-search" @click="searchReply"></el-button>
+          </el-input>
+          <div class="replyContent">
+            <el-collapse v-show="replySearchList" v-model="replySearchListActive">
+              <el-collapse-item v-for="reply in replySearchList" :key="reply.group_id"
+                                :title="reply.group_name" :name="reply.group_id">
+                <template slot="title">
+                  <i class="el-icon-folder"></i>&nbsp;{{ reply.group_name }}
+                </template>
+                <div class="replyItem" @click="messageContent=item.item_content"
+                     v-for="item in reply.items">{{ item.item_content }} &nbsp;&nbsp;<el-button
+                    @click="deleteReplyContent(item.item_id)" type="text">删除
+                </el-button>
+                </div>
+                <el-button
+                    @click="replyContentDialog=true;groupName=reply.group_name;groupId=reply.group_id"
+                    type="text">+添加回复内容
+                </el-button>
+                <el-button @click="deleteReplyGroup(reply.group_id)" type="text">-删除组</el-button>
+              </el-collapse-item>
+            </el-collapse>
+            <el-collapse v-show="replySearchList.length==0">
+              <el-collapse-item v-for="reply in replys" :key="reply.group_id" :title="reply.group_name"
+                                :name="reply.group_id">
+                <template slot="title">
+                  <i class="el-icon-s-order"></i>&nbsp;{{ reply.group_name }}
+                </template>
+                <div class="replyItem" @click="messageContent=item.item_content"
+                     v-for="item in reply.items">
+                  <el-popover
+                      placement="left"
+                      width="300"
+                      trigger="hover">
+                    <div v-html="replaceContent(item.item_content)">
+                    </div>
+                    <div class="replyItemTitle" slot="reference"><i
+                        class="header-icon el-icon-document"></i> {{ item.item_name }}
+                    </div>
+                  </el-popover>
+                  <el-button
+                      @click="editReplyContent('no',item.item_id,item.item_name,item.item_content)"
+                      type="text">编辑
+                  </el-button>
+                  <el-button @click="deleteReplyContent(item.item_id)" type="text">删除</el-button>
+                </div>
+                <el-button
+                    @click="replyContentDialog=true;groupName=reply.group_name;groupId=reply.group_id"
+                    type="text">+添加回复内容
+                </el-button>
+                <el-popover
+                    placement="top"
+                    width="100"
+                    v-model="visible">
+                  <p>确定删除吗？</p>
+                  <div style="text-align: right; margin: 0">
+                    <el-button size="mini" type="text" @click="visible = false">取消</el-button>
+                    <el-button type="primary" size="mini"
+                               @click="visible = false;deleteReplyGroup(reply.group_id)">确定
+                    </el-button>
+                  </div>
+                  <el-button slot="reference" type="text">-删除组</el-button>
+                </el-popover>
+
+              </el-collapse-item>
+            </el-collapse>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+    <!--图片放大-->
+    <div id="bigPic" class="bigPic">
+      <img src="/static/images/3.jpg"/>
+    </div>
+    <!--//图片放大-->
+    <audio id="chatMessageAudio">
+      <source id="chatMessageAudioSource" src="/static/images/alert2.ogg" type="audio/mpeg"/>
+    </audio>
+    <audio id="chatMessageSendAudio">
+      <source id="chatMessageSendAudioSource" src="/static/images/sent.ogg" type="audio/mpeg"/>
+    </audio>
+    <!--转接-->
+    <el-dialog
+        title="转接客服"
+        :visible.sync="transKefuDialog"
+        width="30%"
+        top="0"
+    >
+      <el-table
+          :data="otherKefus"
+          style="width: 100%">
+        <el-table-column
+            prop="nickname"
+            label="客服">
+        </el-table-column>
+        <el-table-column
+            prop="status"
+            label="操作">
+          <template slot-scope="scope">
+            <el-tag v-show="scope.row.status=='offline'"
+                    disable-transitions>离线
+            </el-tag>
+            <el-button v-show="scope.row.status=='online'" type="primary"
+                       @click="transKefuVisitor(scope.row.name,visitor.visitor_id)">转接
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <span slot="footer" class="dialog-footer">
+                <el-button @click="transKefuDialog = false">取 消</el-button>
+            </span>
+    </el-dialog>
+    <!--//转接-->
+    <!--回复分组-->
+    <el-dialog
+        title="添加分组"
+        :visible.sync="replyGroupDialog"
+        width="30%"
+        top="0"
+    >
+      <el-input v-model="groupName"></el-input>
+      <span slot="footer" class="dialog-footer">
+                <el-button @click="addReplyGroup">保 存</el-button>
+                <el-button @click="replyGroupDialog = false">取 消</el-button>
+              </span>
+    </el-dialog>
+    <!--//回复分组-->
+    <!--回复内容-->
+    <el-dialog
+        title="添加回复内容"
+        :visible.sync="replyContentDialog"
+        width="30%"
+        top="0"
+    >
+      <el-input style="margin-bottom: 10px;" placeholder="关键词" v-model="replyTitle"></el-input>
+      <el-input placeholder="内容" type="textarea" v-model="replyContent"></el-input>
+      <span slot="footer" class="dialog-footer">
+                <el-button @click="addReplyContent">保 存</el-button>
+                <el-button @click="replyContentDialog = false">取 消</el-button>
+              </span>
+    </el-dialog>
+    <el-dialog
+        title="编辑回复内容"
+        :visible.sync="editReplyContentDialog"
+        width="30%"
+        top="0"
+    >
+      <el-input style="margin-bottom: 10px;" placeholder="关键词" v-model="replyTitle"></el-input>
+      <el-input placeholder="内容" type="textarea" v-model="replyContent"></el-input>
+      <span slot="footer" class="dialog-footer">
+                <el-button @click="editReplyContent('yes')">保 存</el-button>
+                <el-button @click="editReplyContentDialog = false">取 消</el-button>
+              </span>
+    </el-dialog>
+    <!--//回复内容-->
+  </div>
+</template>
+<script>
+import {
+  getWsBaseUrl,
+  replaceContent,
+  placeFace,
+  faceTitles,
+  formatDate,
+  b64ToUtf8, sleep,
+} from '@/../public/static/js/functions.js';
+import ReconnectingWebSocket from '@/../public/static/js/reconnecting-websocket.min';
+
+export default {
+  data() {
+    return {
+      visible: false,
+      chatTitleType: "info",
+      fullscreenLoading: true,
+      leftTabActive: "first",
+      rightTabActive: "visitorInfo",
+      users: [],
+      usersMap: [],
+      server: getWsBaseUrl() + "/ws_kefu?token=" + localStorage.getItem("token"),
+      socketClosed: false,
+      messageContent: "",
+      currentGuest: "",
+      msgList: [],
+      chatTitle: "暂时未处理咨询",
+      chatInputing: "",
+
+      visitor: {
+        visitor_id: "",
+        refer: "",
+        client_ip: "",
+        city: "",
+        status: "",
+        source_ip: "",
+        created_at: "",
+      },
+      visitorExtra: [],
+      visitors: [],
+      visitorCount: 0,
+      visitorCurrentPage: 1,
+      visitorPageSize: 10,
+      face: [],
+      transKefuDialog: false,
+      otherKefus: [],
+      replyGroupDialog: false,
+      replyContentDialog: false,
+      editReplyContentDialog: false,
+      replySearch: "",
+      replySearchList: [],
+      replySearchListActive: [],
+      groupName: "",
+      groupId: "",
+      replys: [],
+      replyId: "",
+      replyContent: "",
+      replyTitle: "",
+      ipBlacks: [],
+      sendDisabled: false,
+      showFaceIcon: false,
+      showLoadMore: false,
+      messages: {
+        page: 1,
+        pagesize: 15,
+        list: [],
+      },
+    }
+  },
+  methods: {
+    sendKefuOnline() {
+      let mes = {}
+      mes.type = "kfOnline";
+      mes.data = this.kfConfig;
+      this.socket.send(JSON.stringify(mes));
+    },
+    //心跳
+    ping() {
+      let _this = this;
+      let mes = {}
+      mes.type = "ping";
+      mes.data = "";
+      setInterval(function () {
+        if (_this.socket != null) {
+          _this.socket.send(JSON.stringify(mes));
+        }
+      }, 20000)
+      setInterval(function () {
+        _this.getOnlineVisitors();
+      }, 120000);
+    },
+    //初始化websocket
+    initConn() {
+      this.socket.onmessage = this.OnMessage;
+      this.socket.onopen = this.OnOpen;
+    },
+    OnOpen() {
+      this.sendKefuOnline();
+    },
+    OnMessage(e) {
+      const redata = JSON.parse(e.data);
+      switch (redata.type) {
+        case "close":
+          this.socket.close();
+          this.$alert('客服在其他地方登录，当前登录状态退出', '通知', {
+            confirmButtonText: '确定',
+            callback: function () {
+              localStorage.removeItem("token");
+              window.location.href = "/login";
+            }
+          });
+          break;
+        case "inputing":
+          this.handleInputing(redata.data);
+          //this.sendKefuOnline();
+          break;
+        case "allUsers":
+          this.handleOnlineUsers(redata.data);
+          //this.sendKefuOnline();
+          break;
+        case "userOnline":
+          console.log("用户上线")
+          this.addOnlineUser(redata.data);
+          break;
+        case "userOffline":
+          this.removeOfflineUser(redata.data);
+          //this.sendKefuOnline();
+          break;
+        case "notice":
+          //发送通知
+          var _this = this;
+          window.parent.postMessage({
+            name: redata.data.username,
+            body: redata.data.content,
+            icon: redata.data.avator
+          });
+          _this.alertSound();
+          break;
+      }
+
+
+      if (redata.type == "message") {
+        let msg = redata.data
+        let content = {}
+        let _this = this;
+        content.avator = msg.avator;
+        content.name = msg.name;
+        content.content = replaceContent(msg.content);
+        content.is_kefu = msg.is_kefu == "yes" ? true : false;
+        content.time = msg.time;
+        if (msg.id == this.currentGuest) {
+          this.msgList.push(content);
+        }
+
+        for (let i = 0; i < this.users.length; i++) {
+          if (this.users[i].uid == msg.id) {
+            this.$set(this.users[i], 'last_message', msg.content);
+            if (this.visitor.visitor_id != msg.id) {
+              this.$set(this.users[i], 'hidden_new_message', false);
+            }
+          }
+        }
+        this.scrollBottom();
+        if (content.is_kefu) {
+          return;
+        }
+        window.parent.postMessage({
+          name: msg.name,
+          body: msg.content,
+          icon: msg.avator
+
+        });
+        _this.alertSound();
+        _this.chatInputing = "";
+      }
+    },
+    //接手客户
+    talkTo(guestId, name) {
+      this.currentGuest = guestId;
+      //发送给客户
+      let mes = {}
+      mes.type = "kfConnect";
+      this.kfConfig.to_id = guestId;
+      mes.data = this.kfConfig;
+      this.socket.send(JSON.stringify(mes));
+
+      //获取当前访客信息
+      this.getVistorInfo(guestId);
+      //获取当前客户消息
+      this.messages.page = 1;
+      this.msgList = [];
+      this.getHistoryMessage();
+      //this.getMesssagesByVisitorId(guestId);
+      for (var i = 0; i < this.users.length; i++) {
+        if (this.users[i].uid == guestId) {
+          this.$set(this.users[i], 'hidden_new_message', true);
+        }
+      }
+    },
+    //发送给客户
+    chatToUser() {
+      this.messageContent = this.messageContent.trim("\r\n");
+      this.messageContent = this.messageContent.replace("\n", "");
+      this.messageContent = this.messageContent.replace("\r\n", "");
+      if (this.messageContent == "" || this.messageContent == "\r\n" || this.currentGuest == "") {
+        return;
+      }
+      if (this.sendDisabled) {
+        return;
+      }
+      this.sendDisabled = true;
+      let _this = this;
+      let mes = {};
+      mes.type = "kefu";
+      mes.content = this.messageContent;
+      mes.from_id = this.kfConfig.id;
+      mes.to_id = this.currentGuest;
+      mes.content = this.messageContent;
+      $.post("/2/message", mes, function (res) {
+        _this.sendDisabled = false;
+        if (res.code != 200) {
+          _this.$message({
+            message: res.msg,
+            type: 'error'
+          });
+          return;
+        }
+        _this.messageContent = "";
+        _this.sendSound();
+      });
+
+      // let content = {}
+      // content.avator = this.kfConfig.avator;
+      // content.name = this.kfConfig.name;
+      // content.content = replaceContent(this.messageContent);
+      // content.is_kefu = true;
+      // content.time = '';
+      // this.msgList.push(content);
+      _this.sendDisabled = false;
+      this.scrollBottom();
+    },
+    //处理当前在线用户列表
+    addOnlineUser: function (retData) {
+      var flag = false;
+      retData.last_message = retData.last_message;
+      retData.status = 1;
+      retData.name = retData.username;
+      retData.hidden_new_message = true;
+      for (let i = 0; i < this.users.length; i++) {
+        if (this.users[i].uid == retData.uid) {
+          flag = true;
+        }
+      }
+      if (!flag) {
+        this.users.unshift(retData);
+      }
+      for (let i = 0; i < this.visitors.length; i++) {
+        if (this.visitors[i].visitor_id == retData.uid) {
+          this.visitors[i].status = 1;
+          break;
+        }
+      }
+      if (this.visitor.visitor_id == retData.uid) {
+        this.getVistorInfo(retData.uid)
+      }
+
+    },
+    //处理当前在线用户列表
+    removeOfflineUser: function (retData) {
+      for (let i = 0; i < this.users.length; i++) {
+        if (this.users[i].uid == retData.uid) {
+          this.users.splice(i, 1);
+        }
+      }
+      let vid = retData.uid;
+      for (let i = 0; i < this.visitors.length; i++) {
+        if (this.visitors[i].visitor_id == vid) {
+          this.visitors[i].status = 0;
+          break;
+        }
+      }
+    },
+    //处理当前在线用户列表
+    handleOnlineUsers: function (retData) {
+      if (this.currentGuest == "") {
+        this.chatTitle = "连接成功,等待处理中...";
+      }
+      this.usersMap = [];
+      for (let i = 0; i < retData.length; i++) {
+        this.usersMap[retData[i].uid] = retData[i].username;
+        retData[i].last_message = "新访客";
+      }
+      if (this.users.length == 0) {
+        this.users = retData;
+      }
+      for (let i = 0; i < this.visitors.length; i++) {
+        let vid = this.visitors[i].visitor_id;
+        if (typeof this.usersMap[vid] == "undefined") {
+          this.visitors[i].status = 0;
+        } else {
+          this.visitors[i].status = 1;
+        }
+      }
+
+    },
+    //处理正在输入
+    handleInputing: function (retData) {
+      if (retData.from == this.visitor.visitor_id) {
+        this.chatInputing = "|正在输入：" + retData.content + "...";
+        if (retData.content == "") {
+          this.chatInputing = "";
+        }
+      }
+      for (var i = 0; i < this.users.length; i++) {
+        if (this.users[i].uid == retData.from) {
+          this.$set(this.users[i], 'last_message', retData.content + "...");
+        }
+      }
+    },
+
+    //获取在线用户列表
+    getOnlineVisitors() {
+      let _this = this;
+      $.ajax({
+        type: "get",
+        url: "/visitors_kefu_online",
+        headers: {
+          "token": localStorage.getItem("token")
+        },
+        success: function (data) {
+          if (data.code == 200 && data.result != null) {
+            _this.users = data.result;
+            for (var i = 0; i < _this.users.length; i++) {
+              _this.$set(_this.users[i], 'hidden_new_message', true);
+            }
+          }
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          }
+          if (data.code == 400) {
+            window.location.href = "/login";
+          }
+        }
+      });
+    },
+    getHistoryMessage() {
+      let params = {
+        page: this.messages.page,
+        pagesize: this.messages.pagesize,
+        visitor_id: this.currentGuest,
+      }
+      let _this = this;
+      $.get("/2/messagesPages", params, function (res) {
+        let msgList = res.result.list;
+        if (msgList.length >= _this.messages.pagesize) {
+          _this.showLoadMore = true;
+        } else {
+          _this.showLoadMore = false;
+        }
+        for (let i in msgList) {
+          let item = msgList[i];
+          //let content = {}
+          if (item["mes_type"] == "kefu") {
+            item.is_kefu = true;
+            item.avator = item["kefu_avator"];
+            item.name = item["kefu_name"];
+          } else {
+            item.is_kefu = false;
+            item.avator = item["visitor_avator"];
+            item.name = item["visitor_name"];
+          }
+          item.content = replaceContent(item["content"]);
+          item.time = item["create_time"];
+          _this.msgList.unshift(item);
+        }
+        if (_this.messages.page == 1) {
+          _this.scrollBottom();
+        }
+        _this.messages.page++;
+      });
+    },
+    //获取信息列表
+    getMesssagesByVisitorId(visitorId, isAll) {
+      let _this = this;
+      $.ajax({
+        type: "get",
+        url: "/2/messages?visitorId=" + visitorId,
+        headers: {
+          "token": localStorage.getItem("token")
+        },
+        success: function (data) {
+          if (data.code == 200 && data.result != null) {
+            _this.showLoadMore = false;
+            let msgList = data.result;
+            _this.msgList = [];
+            //只展示10条数据
+            if (!isAll && msgList.length > 10) {
+              var i = msgList.length - 10
+            } else {
+              var i = 0;
+            }
+            for (; i < msgList.length; i++) {
+              let visitorMes = msgList[i];
+              let content = {}
+              if (visitorMes["mes_type"] == "kefu") {
+                content.is_kefu = true;
+                content.avator = visitorMes["kefu_avator"];
+                content.name = visitorMes["kefu_name"];
+              } else {
+                content.is_kefu = false;
+                content.avator = visitorMes["visitor_avator"];
+                content.name = visitorMes["visitor_name"];
+              }
+              content.content = replaceContent(visitorMes["content"]);
+              content.time = visitorMes["create_time"];
+              _this.msgList.unshift(content);
+              _this.scrollBottom();
+            }
+          }
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          }
+          if (data.code == 400) {
+            window.location.href = "/login";
+          }
+        }
+      });
+    },
+    //获取客服信息
+    getVistorInfo(vid) {
+      let _this = this;
+      $.ajax({
+        type: "get",
+        url: "/visitor",
+        data: {visitorId: vid},
+        headers: {
+          "token": localStorage.getItem("token")
+        },
+        success: function (data) {
+          let extra;
+          if (data.result != null) {
+            let r = data.result;
+            _this.visitor = r;
+            _this.visitor.created_at = formatDate(r.created_at);
+            _this.visitor.updated_at = formatDate(r.updated_at);
+            // _this.visitor.refer=r.refer;
+            // _this.visitor.city=r.city;
+            // _this.visitor.client_ip=r.client_ip;
+            // _this.visitor.source_ip=r.source_ip;
+            _this.visitor.status = r.status == 1 ? "在线" : "离线";
+
+            //_this.visitor.visitor_id=r.visitor_id;
+            _this.chatTitle = "#" + r.id + "|" + r.name;
+            _this.chatTitleType = "success";
+            _this.visitorExtra = [];
+            if (r.extra != "") {
+              if (r.extra!="{"){
+                extra = JSON.parse(b64ToUtf8(r.extra));
+              }
+              if (typeof extra == "string") {
+                extra = JSON.parse(extra);
+              }
+              for (var key in extra) {
+                if (extra[key] == "") {
+                  extra[key] = "无";
+                }
+                if (key == "visitorAvatar" || key == "visitorName") continue;
+                var temp = {key: key, val: extra[key]}
+                _this.visitorExtra.push(temp);
+              }
+            }
+          }
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          }
+        }
+      });
+    },
+    //关闭访客
+    closeVisitor(visitorId) {
+      let _this = this;
+      $.ajax({
+        type: "get",
+        url: "/2/message_close",
+        data: {visitor_id: visitorId},
+        headers: {
+          "token": localStorage.getItem("token")
+        },
+        success: function (data) {
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          }
+        }
+      });
+    },
+    //处理tab切换
+    handleTabClick(tab, event) {
+      let _this = this;
+      if (tab.name == "first") {
+        this.getOnlineVisitors();
+      }
+      if (tab.name == "second") {
+        this.getVisitorPage(1);
+      }
+      if (tab.name == "blackList") {
+      }
+    },
+    //所有访客分页展示
+    visitorPage(page) {
+      this.getVisitorPage(page);
+    },
+    //获取访客分页
+    getVisitorPage(page) {
+      let _this = this;
+      $.ajax({
+        type: "get",
+        url: "/visitors",
+        data: {page: page},
+        headers: {
+          "token": localStorage.getItem("token")
+        },
+        success: function (data) {
+          if (data.result.list != null) {
+            _this.visitors = data.result.list;
+            _this.visitorCount = data.result.count;
+            _this.visitorPageSize = data.result.pagesize;
+          }
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          }
+        }
+      });
+    },
+    replaceContent(content) {
+      return replaceContent(content)
+    },
+    //滚到底部
+    scrollBottom() {
+      this.$nextTick(() => {
+        $('.chatBox').scrollTop($(".chatBox")[0].scrollHeight);
+      });
+    },
+    //jquery
+    initJquery() {
+      this.$nextTick(() => {
+        var _this = this;
+        $(function () {
+          //展示表情
+          var faces = placeFace();
+          $.each(faceTitles, function (index, item) {
+            _this.face.push({"name": item, "path": faces[item]});
+          });
+        });
+      });
+    },
+    //表情点击事件
+    faceIconClick(index) {
+      this.showFaceIcon = false;
+      this.messageContent += "face" + this.face[index].name;
+    },
+    //上传图片
+    uploadImg(url) {
+      let _this = this;
+      $('#uploadImg').after('<input type="file" accept="image/gif,image/jpeg,image/jpg,image/png" id="uploadImgFile" name="file" style="display:none" >');
+      $("#uploadImgFile").click();
+      $("#uploadImgFile").change(function (e) {
+        var formData = new FormData();
+        var file = $("#uploadImgFile")[0].files[0];
+        formData.append("imgfile", file); //传给后台的file的key值是可以自己定义的
+        filter(file) && $.ajax({
+          url: url || '',
+          type: "post",
+          data: formData,
+          contentType: false,
+          processData: false,
+          dataType: 'JSON',
+          mimeType: "multipart/form-data",
+          success: function (res) {
+            if (res.code != 200) {
+              _this.$message({
+                message: res.msg,
+                type: 'error'
+              });
+            } else {
+              _this.messageContent += 'img[/' + res.result.path + ']';
+              _this.chatToUser();
+            }
+          },
+          error: function (data) {
+            console.log(data);
+          }
+        });
+      });
+    },
+    //上传文件
+    uploadFile: function (url) {
+      let _this = this;
+      $('#uploadFile').after('<input type="file"  id="uploadRealFile" name="file2" style="display:none" >');
+      $("#uploadRealFile").click();
+      $("#uploadRealFile").change(function (e) {
+        var formData = new FormData();
+        var file = $("#uploadRealFile")[0].files[0];
+        formData.append("realfile", file); //传给后台的file的key值是可以自己定义的
+        $.ajax({
+          url: url || '',
+          type: "post",
+          data: formData,
+          contentType: false,
+          processData: false,
+          dataType: 'JSON',
+          mimeType: "multipart/form-data",
+          success: function (res) {
+
+            if (res.code != 200) {
+              _this.$message({
+                message: res.msg,
+                type: 'error'
+              });
+            } else {
+              var data = JSON.stringify({
+                name: res.result.name,
+                ext: res.result.ext,
+                size: res.result.size,
+                path: '/' + res.result.path,
+              })
+              _this.messageContent += 'attachment[' + data + ']';
+              _this.chatToUser();
+            }
+          },
+          error: function (data) {
+            console.log(data);
+          }
+        });
+      });
+    },
+    addIpblack(ip) {
+      let _this = this;
+      $.ajax({
+        type: "post",
+        url: "/ipblack",
+        data: {ip: ip},
+        headers: {
+          "token": localStorage.getItem("token")
+        },
+        success: function (data) {
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          } else {
+            _this.$message({
+              message: data.msg,
+              type: 'success'
+            });
+          }
+        }
+      });
+    },
+    //粘贴上传图片
+    onPasteUpload(event) {
+      let items = event.clipboardData && event.clipboardData.items;
+      let file = null
+      if (items && items.length) {
+        // 检索剪切板items
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            file = items[i].getAsFile()
+          }
+        }
+      }
+      if (!file) {
+        return;
+      }
+      let _this = this;
+      var formData = new FormData();
+      formData.append('imgfile', file);
+      $.ajax({
+        url: '/uploadimg',
+        type: "post",
+        data: formData,
+        contentType: false,
+        processData: false,
+        dataType: 'JSON',
+        mimeType: "multipart/form-data",
+        success: function (res) {
+          if (res.code != 200) {
+            _this.$message({
+              message: res.msg,
+              type: 'error'
+            });
+          } else {
+            _this.messageContent += 'img[/' + res.result.path + ']';
+            _this.chatToUser();
+          }
+        },
+        error: function (data) {
+          console.log(data);
+        }
+      });
+    },
+    openUrl(url) {
+      window.open(url);
+    },
+    //提示音
+    alertSound() {
+      var b = document.getElementById("chatMessageAudio");
+      var p = b.play();
+      p && p.then(function () {
+      }).catch(function (e) {
+      });
+    },
+    sendSound() {
+      var b = document.getElementById("chatMessageSendAudio");
+      var p = b.play();
+      p && p.then(function () {
+      }).catch(function (e) {
+      });
+    },
+    //转移客服
+    transKefu() {
+      this.transKefuDialog = true;
+      var _this = this;
+      this.sendAjax("/other_kefulist", "get", {}, function (result) {
+        _this.otherKefus = result;
+      });
+    },
+    //转移访客客服
+    transKefuVisitor(kefu, visitorId) {
+      var _this = this;
+      this.sendAjax("/trans_kefu", "get", {kefu_id: kefu, visitor_id: visitorId}, function (result) {
+        //_this.otherKefus=result;
+        _this.transKefuDialog = false
+      });
+    },
+    //保存回复分组
+    addReplyGroup() {
+      var _this = this;
+      this.sendAjax("/reply", "post", {group_name: _this.groupName}, function (result) {
+        //_this.otherKefus=result;
+        _this.replyGroupDialog = false
+        _this.groupName = "";
+        _this.getReplys();
+      });
+    },
+    //添加回复内容
+    addReplyContent() {
+      var _this = this;
+      this.sendAjax("/reply_content", "post", {
+        group_id: _this.groupId,
+        item_name: _this.replyTitle,
+        content: _this.replyContent
+      }, function (result) {
+        //_this.otherKefus=result;
+        _this.replyContentDialog = false
+        _this.replyContent = "";
+        _this.getReplys();
+      });
+    },
+    //获取快捷回复
+    getReplys() {
+      var _this = this;
+      this.sendAjax("/replys", "get", {}, function (result) {
+        _this.replys = result;
+      });
+    },
+    //删除回复
+    deleteReplyGroup(id) {
+      var _this = this;
+      this.sendAjax("/reply?id=" + id, "delete", {}, function (result) {
+        _this.getReplys();
+      });
+    },
+    //删除回复
+    deleteReplyContent(id) {
+      var _this = this;
+      this.sendAjax("/reply_content?id=" + id, "delete", {}, function (result) {
+        _this.getReplys();
+      });
+    },
+    //编辑回复
+    editReplyContent(save, id, title, content) {
+      var _this = this;
+      if (save == 'yes') {
+        var data = {
+          reply_id: this.replyId,
+          reply_title: this.replyTitle,
+          reply_content: this.replyContent
+        }
+        this.sendAjax("/reply_content_save", "post", data, function (result) {
+          _this.editReplyContentDialog = false;
+          _this.getReplys();
+        });
+      } else {
+        this.editReplyContentDialog = true;
+        this.replyId = id;
+        this.replyTitle = title;
+        this.replyContent = content;
+      }
+
+    },
+    //搜索回复
+    searchReply() {
+      var _this = this;
+      _this.replySearchListActive = [];
+      if (this.replySearch == "") {
+        _this.replySearchList = [];
+      }
+      this.sendAjax("/reply_search", "post", {search: this.replySearch}, function (result) {
+        _this.replySearchList = result;
+        for (var i in result) {
+          _this.replySearchListActive.push(result[i].group_id);
+        }
+      });
+    },
+    //获取黑名单
+    getIpblacks() {
+      var _this = this;
+      this.sendAjax("/ipblacks", "get", {}, function (result) {
+        _this.ipBlacks = result;
+      });
+    },
+    //删除黑名单
+    delIpblack(ip) {
+      let _this = this;
+      this.sendAjax("/ipblack?ip=" + ip, "DELETE", {ip: ip}, function (result) {
+        _this.sendAjax("/ipblacks", "get", {}, function (result) {
+          _this.ipBlacks = result;
+        });
+      });
+    },
+    //划词搜索
+    selectText() {
+      return false;
+      var _this = this;
+      $('body').click(function () {
+        try {
+          var selecter = window.getSelection().toString();
+          if (selecter != null && selecter.trim() != "") {
+            _this.replySearch = selecter.trim();
+            _this.searchReply();
+          } else {
+            _this.replySearch = "";
+          }
+        } catch (err) {
+          var selecter = document.selection.createRange();
+          var s = selecter.text;
+          if (s != null && s.trim() != "") {
+            _this.replySearch = s.trim();
+            _this.searchReply();
+          } else {
+            _this.replySearch = "";
+          }
+        }
+        var status = $('.faceBox').css("display");
+        if (status == "block") {
+          $('.faceBox').hide();
+        }
+      });
+    },
+    sendAjax(url, method, params, callback) {
+      let _this = this;
+      $.ajax({
+        type: method,
+        url: url,
+        data: params,
+        headers: {
+          "token": localStorage.getItem("token")
+        },
+        error: function (res) {
+          var data = JSON.parse(res.responseText);
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          }
+        },
+        success: function (data) {
+          if (data.code != 200) {
+            _this.$message({
+              message: data.msg,
+              type: 'error'
+            });
+          } else if (data.result != null) {
+            callback(data.result);
+          } else {
+            callback(data);
+          }
+        }
+      });
+    },
+  },
+  mounted() {
+    document.addEventListener('paste', this.onPasteUpload)
+  },
+  created: function () {
+    this.initConn()
+    this.initJquery();
+    this.getOnlineVisitors();
+    this.getReplys();
+    this.getIpblacks();
+    this.ping();
+  },
+  props: ['socket', 'kfConfig'],
+}
+</script>
