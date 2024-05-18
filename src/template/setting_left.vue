@@ -27,6 +27,16 @@
           <el-menu-item index="2-7" v-on:click="changeComponent('setting_indexpages')">索引页</el-menu-item>
         </el-menu-item-group>
       </el-submenu>
+      <el-submenu index="3">
+        <template slot="title">
+          <i class="el-icon-s-custom"></i>
+          <span>客服设置</span>
+        </template>
+        <el-menu-item-group>
+          <el-menu-item index="4-6" v-on:click="changeComponent('setting_role_list')">客服分类</el-menu-item>
+          <el-menu-item index="4-5" v-on:click="changeComponent('setting_kefu_list')">客服列表</el-menu-item>
+        </el-menu-item-group>
+      </el-submenu>
     </el-menu>
   </el-aside>
 </template>

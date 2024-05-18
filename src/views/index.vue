@@ -1,43 +1,83 @@
+<style>
+.kefuSelect {
+  display: flex;
+  justify-content: center;
+}
+
+h2 {
+  display: flex;
+  justify-content: center;
+}
+.kefuList{
+
+}
+</style>
 <template>
   <div>
-    <!--  <title>应急在线客服系统</title>-->
-
-    <h3 id="客服对接">客服对接</h3>
-    <p>聊天链接</p>
-    <p><a href="http://127.0.0.1:8080/chatIndex?kefu_id=kefu2">http://127.0.0.1:8080/chatIndex?kefu_id=kefu2</a></p>
-    <p>弹窗使用</p>
-    <pre>
-    <code>    (function(a, b, c, d) {
-        let h = b.getElementsByTagName(&#39;head&#39;)[0];let s = b.createElement(&#39;script&#39;);
-        s.type = &#39;text/javascript&#39;;s.src = c+&quot;/static/js/kefu-front.js&quot;;s.onload = s.onreadystatechange = function () {
-            if (!this.readyState || this.readyState === &quot;loaded&quot; || this.readyState === &quot;complete&quot;) d(c);
-        };h.appendChild(s);
-    })(window, document,&quot;http://127.0.0.1:8080&quot;,function(u){
-        KEFU.init({
-            KEFU_URL:u,
-            KEFU_KEFU_ID: &quot;kefu2&quot;
-        })
-    });
-  </code>
-  </pre>
+    <h2>请选择您要咨询的客服类型</h2>
+    <div class="kefuSelect">
+      <el-tabs v-model="activeName" @tab-click="handleClick" :stretch=true>
+        <el-tab-pane
+            v-for="role in roleList"
+            :key="role.role_id"
+            :label="role.role_name"
+            :name="role.role_id.toString()"
+        />
+      </el-tabs>
+    </div>
+    <div class="kefuList" style="text-align: center;">
+      <el-row v-for="item in kefuList" :key="item.uid">
+        <div style="cursor:pointer;" v-on:click="goToLink(item.name)">
+          <div style="display: flex; justify-content: center;align-items: center;">
+            <el-avatar :size="40" :src="item.avator" style="margin-right: 8px;"></el-avatar>
+            <span>{{ item.nickname }}</span>
+          </div>
+        </div>
+      </el-row>
+    </div>
   </div>
 </template>
 
 
-<script type='text/javascript'>
-(function (a, b, c, d) {
-  let h = b.getElementsByTagName('head')[0];
-  let s = b.createElement('script');
-  s.type = 'text/javascript';
-  s.src = c + "/static/js/kefu-front.js";
-  s.onload = s.onreadystatechange = function () {
-    if (!this.readyState || this.readyState === "loaded" || this.readyState === "complete") d(c);
-  };
-  h.appendChild(s);
-})(window, document, "http://127.0.0.1:8081", function (u) {
-  KEFU.init({
-    KEFU_URL: u,
-    KEFU_KEFU_ID: "kefu2",
-  })
-});
+<script>
+import {sendAjax} from "../../public/static/js/functions";
+
+export default {
+  data() {
+    return {
+      activeName: "3",
+      kefuList: [],
+      roleMap: new Map(),
+      roleList: [],
+    };
+  },
+  methods: {
+    goToLink(id){
+      window.location.href = "http://127.0.0.1:8080/chatIndex?kefu_id="+id;
+    },
+    handleClick(tab, event) {
+      let _this = this
+      sendAjax("/kefulist", "get", {}, function (result) {
+        _this.kefuList = result.filter(item => item.role_id === _this.activeName);
+      });
+
+    },
+    roleInit() {
+      let _this = this
+      sendAjax("/roles", "get", {}, function (result) {
+        _this.roleList = result.reverse();
+      });
+    },
+    kefuInit() {
+      let _this = this
+      sendAjax("/kefulist", "get", {}, function (result) {
+        _this.kefuList = result.filter(item => item.role_id === '3');
+      });
+    }
+  },
+  created() {
+    this.roleInit()
+    this.kefuInit()
+  }
+};
 </script>

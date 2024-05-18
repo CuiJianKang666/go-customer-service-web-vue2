@@ -117,8 +117,9 @@ import ReconnectingWebSocket from '@/../public/static/js/reconnecting-websocket.
 export default {
   data() {
     return {
+      title:"",
       REFER: "",
-      KEFU_ID: "kefu2",
+      KEFU_ID: "",
       LANG: "",
       window: window,
       server: getWsBaseUrl() + "/ws_visitor",
@@ -150,7 +151,13 @@ export default {
   methods: {
     //初始化websocket
     initConn: function () {
-      let socket = new ReconnectingWebSocket(this.server + "?visitor_id=" + this.visitor.visitor_id);//创建Socket实例
+      let socket
+      try {
+        socket = new ReconnectingWebSocket(this.server + "?visitor_id=" + this.visitor.visitor_id);//创建Socket实例
+      } catch (error) {
+        console.error('WebSocket 连接错误:', error);
+      }
+
       this.socket = socket
       this.socket.onmessage = this.OnMessage;
       this.socket.onopen = this.OnOpen;
@@ -217,7 +224,7 @@ export default {
           notification.close();
         });
         this.scrollBottom();
-        flashTitle();//标题闪烁
+        flashTitle(document.title);//标题闪烁
         clearInterval(this.timer);
         this.alertSound();//提示音
       }
@@ -303,10 +310,11 @@ export default {
       this.focusSendConn = true;
       console.log('websocket 断开: ' + e.code + ' ' + e.reason + ' ' + e.wasClean)
       console.log(e)
-      //this.socketClosed=true;
-      // this.chatTitle="连接关闭!请重新打开页面";
-      // $(".chatBox").append("<div class=\"chatTime\">"+this.chatTitle+"</div>");
-      // this.scrollBottom();
+
+      this.socketClosed=true;
+      this.chatTitle="连接关闭!请重新打开页面";
+      $(".chatBox").append("<div class=\"chatTime\">"+this.chatTitle+"</div>");
+      this.scrollBottom();
     },
     //获取当前用户信息
     getUserInfo: function () {
@@ -463,13 +471,13 @@ export default {
       var _this = this;
       this.initCss();
       $('body').click(function () {
-        clearFlashTitle();
+        clearFlashTitle(_this.title);
         window.parent.postMessage({type: "focus"}, "*");
         $('.faceBox').hide();
       });
       window.onfocus = function () {
         //_this.scrollBottom();
-        clearFlashTitle();
+        clearFlashTitle(_this.title);
         window.parent.postMessage({type: "focus"}, "*");
         if (_this.socketClosed) {
           return;
@@ -650,13 +658,15 @@ export default {
     },
   },
   mounted: function () {
-    document.addEventListener('paste', this.onPasteUpload),
-        document.addEventListener('scroll', this.textareaBlur),
-        this.KEFU_ID = this.$route.query.kefu_id
-    this.REFER = this.$route.query.referer
+    document.addEventListener('paste', this.onPasteUpload)
+    document.addEventListener('scroll', this.textareaBlur)
+
   },
   created: function () {
+    this.title = this.$route.meta.data.title
     this.init();
+    this.KEFU_ID = this.$route.query.kefu_id
+    this.REFER = this.$route.query.referer
     this.getUserInfo();
     //加载历史记录
     //this.msgList=this.getHistory();

@@ -1,8 +1,4 @@
-<!--<meta charset="utf-8">-->
-<!--<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">-->
-<!--<meta name="description" content="">-->
-<!--<title>GO语言开源客服系统-GOFLY</title>-->
-<!--<link rel="stylesheet" href="https://cdn.staticfile.org/element-ui/2.15.1/theme-chalk/index.min.css">-->
+
 <style>
 html,
 body {

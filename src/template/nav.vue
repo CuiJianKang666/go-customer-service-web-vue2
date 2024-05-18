@@ -77,7 +77,6 @@ export default {
     let _this = this
     sendAjax("/kefuinfo", "get", {}, function (result) {
       _this.kefuImg = result.avator;
-      // _this.$set(_this, 'kefuImg', result.avator);
     });
   },
   components: {

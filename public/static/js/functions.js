@@ -74,9 +74,8 @@ export function notify(title, options, callback) {
 
 var titleTimer = 0;
 var titleNum = 0;
-var originTitle = document.title;
 
-export function flashTitle() {
+export function flashTitle(originTitle = document.title) {
     if (titleTimer != 0) {
         return;
     }
@@ -92,10 +91,9 @@ export function flashTitle() {
             document.title = '【new message】' + originTitle;
         }
     }, 500);
-
 }
 
-export function clearFlashTitle() {
+export function clearFlashTitle(originTitle = document.title) {
     clearInterval(titleTimer);
     document.title = originTitle;
 }

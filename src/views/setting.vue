@@ -24,6 +24,8 @@ import setting_ipblack from "@/views/setting_ipblack.vue";
 import setting_pageindex from "@/views/setting_pageindex.vue";
 import setting_indexpages from "@/views/setting_indexpages.vue";
 import setting_deploy from "@/views/setting_deploy.vue";
+import setting_role_list from "@/views/setting_role_list.vue";
+import setting_kefu_list from "@/views/setting_kefu_list.vue";
 
 export default {
   data(){
@@ -50,6 +52,8 @@ export default {
     setting_pageindex,
     setting_indexpages,
     setting_deploy,
+    setting_role_list,
+    setting_kefu_list,
   }
 }
 </script>

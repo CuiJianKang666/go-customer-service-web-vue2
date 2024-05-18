@@ -31,7 +31,9 @@ const routes = [
         path: '/chatIndex',
         name: 'chatIndex',
         component: ()=>import('@/views/chat_page.vue'),
-        meta: {title: '用户聊天页！', keepAlive: false}
+        meta: {title: '用户聊天页！', keepAlive: false,data: { // 自定义的 data 属性
+                title: '用户聊天页！'
+            }}
     },
     {
         path: '/login',

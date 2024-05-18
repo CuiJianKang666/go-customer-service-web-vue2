@@ -1,15 +1,4 @@
-<!--<meta charset="utf-8">-->
-<!--<meta name="description" content="">-->
-<!--<meta name="author" content="">-->
-<!--<title>应急智能客服系统</title>-->
-<!--<link rel="stylesheet" href="https://cdn.staticfile.org/element-ui/2.15.1/theme-chalk/index.min.css">-->
-<!--<script src="https://cdn.staticfile.org/vue/2.6.9/vue.min.js"></script>-->
-<!--<script src="https://cdn.staticfile.org/element-ui/2.15.1/index.js"></script>-->
-<!--<script src="https://cdn.staticfile.org/jquery/3.6.0/jquery.min.js"></script>-->
-<!--<link rel="stylesheet" href="/public/static/css/common.css?v=dgftr65ujhfg">-->
-<!--<script src="/public/static/js/functions.js"></script>-->
-<!--<script src="/public/static/js/reconnecting-websocket.min.js"></script>-->
-<!--<link rel="stylesheet" href="/public/static/css/icon/iconfont.css?v=fgjlgfda"/>-->
+
 <style>
 @import "/public/static/css/common.css?v=dgftr65ujhfg";
 @import "/public/static/css/icon/iconfont.css?v=fgjlgfda";
@@ -87,7 +76,7 @@ html, body {
             <el-tab-pane label="在线用户" name="first">
               <el-row v-for="item in users" :key="item.uid" class="">
                 <div :title="item.last_message" style="cursor:pointer" class="onlineUsers hasLastMsg"
-                     v-bind:class="{'cur': item.uid==currentGuest }"
+                     v-bind:class="{'cur': item.uid==currentGuest}"
                      v-on:click="talkTo(item.uid,item.username)">
                   <el-col :span="4">
                     <el-badge value="new" :hidden="item.hidden_new_message" class="item">
@@ -426,11 +415,11 @@ import {
   formatDate,
   b64ToUtf8, sleep,
 } from '@/../public/static/js/functions.js';
-import ReconnectingWebSocket from '@/../public/static/js/reconnecting-websocket.min';
 
 export default {
   data() {
     return {
+      currentGuest: "",
       visible: false,
       chatTitleType: "info",
       fullscreenLoading: true,
@@ -441,7 +430,6 @@ export default {
       server: getWsBaseUrl() + "/ws_kefu?token=" + localStorage.getItem("token"),
       socketClosed: false,
       messageContent: "",
-      currentGuest: "",
       msgList: [],
       chatTitle: "暂时未处理咨询",
       chatInputing: "",
@@ -508,7 +496,7 @@ export default {
         _this.getOnlineVisitors();
       }, 120000);
     },
-    //初始化websocket
+    //websocket连接处理
     initConn() {
       this.socket.onmessage = this.OnMessage;
       this.socket.onopen = this.OnOpen;
@@ -868,10 +856,6 @@ export default {
             _this.visitor = r;
             _this.visitor.created_at = formatDate(r.created_at);
             _this.visitor.updated_at = formatDate(r.updated_at);
-            // _this.visitor.refer=r.refer;
-            // _this.visitor.city=r.city;
-            // _this.visitor.client_ip=r.client_ip;
-            // _this.visitor.source_ip=r.source_ip;
             _this.visitor.status = r.status == 1 ? "在线" : "离线";
 
             //_this.visitor.visitor_id=r.visitor_id;

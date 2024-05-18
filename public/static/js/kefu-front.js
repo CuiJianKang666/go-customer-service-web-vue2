@@ -301,13 +301,14 @@ KEFU.layerOpen = function (width, height, offset) {
         <div class="kfBarText">
             <div class="kfName">在线客服系统</div>
          </div>
-    </div>
-    `;
+    </div>`
     var _this = this;
     if (!offset) {
         offset = "rb";
     }
+    console.log(this.KEFU_EXTRA)
     var chatUrl = this.KEFU_URL + '/chatIndex?kefu_id=' + this.KEFU_KEFU_ID + '&lang=' + this.KEFU_LANG + '&extra=' + this.KEFU_EXTRA;
+    console.log(chatUrl)
     if (this.VISITOR_ID != "") {
         chatUrl += "&visitor_id=" + this.VISITOR_ID;
     }
