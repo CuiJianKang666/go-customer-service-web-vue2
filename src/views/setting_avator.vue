@@ -32,17 +32,18 @@
   <div style="width:100%">
     <el-container>
       <el-main class="mainMain">
-        <el-form :model="modifyPass" label-width="80px">
+<!--        <el-form :model="modifyPass" label-width="80px">-->
+        <el-form label-width="90px">
           <el-form-item label="账户">
             <el-input v-model="kefuInfo.username"></el-input>
           </el-form-item>
           <el-form-item label="昵称">
             <el-input v-model="kefuInfo.nickname"></el-input>
           </el-form-item>
-          <el-form-item label="原头像">
+          <el-form-item label="头像">
             <el-avatar :size="120" :src="kefuInfo.avator"></el-avatar>
           </el-form-item>
-          <el-form-item label="新头像">
+          <el-form-item label="新头像上传">
             <el-upload
                 class="avatar-uploader"
                 action="/uploadimg"
@@ -71,6 +72,11 @@ export default {
   data(){
     return{
       kefuInfo: {},
+      // modifyPass: {
+      //   old_pass: "",
+      //   new_pass: "",
+      //   confirm_new_pass: ""
+      // },
     }
   },
   methods:{
@@ -90,7 +96,6 @@ export default {
       });
     },
     handleAvatarSuccess(res, file) {
-      console.log(res, file);
       if (res.code != 200) {
         _this.$message({
           message: res.msg,

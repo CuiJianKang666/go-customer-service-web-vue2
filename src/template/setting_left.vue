@@ -23,8 +23,8 @@
           <el-menu-item index="4-6" v-on:click="changeComponent('setting_config')">配置参数</el-menu-item>
           <el-menu-item index="4-5" v-on:click="changeComponent('setting_ipblack')">IP黑名单</el-menu-item>
           <el-menu-item index="2-5" v-on:click="changeComponent('setting_deploy')">网页部署</el-menu-item>
-          <el-menu-item index="2-7" v-on:click="changeComponent('setting_pageindex')">索引页配置</el-menu-item>
-          <el-menu-item index="2-7" v-on:click="changeComponent('setting_indexpages')">索引页</el-menu-item>
+<!--          <el-menu-item index="2-7" v-on:click="changeComponent('setting_pageindex')">索引页配置</el-menu-item>-->
+<!--          <el-menu-item index="2-8" v-on:click="changeComponent('setting_indexpages')">索引页</el-menu-item>-->
         </el-menu-item-group>
       </el-submenu>
       <el-submenu index="3">

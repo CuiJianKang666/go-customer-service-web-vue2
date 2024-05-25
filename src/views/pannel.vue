@@ -1,11 +1,9 @@
 <template>
   <div>
     <Header></Header>
-    <!--  <div style="width:100%;background: #eef0f6">-->
-    <div style="background: #fff;margin: 10px;padding: 10px" id="visitorNums">
+      <div style="background: #fff;margin: 10px;padding: 10px" id="visitorNums">
+      </div>
     </div>
-    <!--  </div>-->
-  </div>
 </template>
 
 
@@ -13,13 +11,14 @@
 import Header from "@/template/header.vue";
 import {sendAjax} from "../../public/static/js/functions";
 import * as echarts from "@/../public/static/js/echarts.min"
+
 export default {
   data() {
     return {
       actionValue: 'pannel'
     };
   },
-  methods:{
+  methods: {
     showStatistics() {
       let _this = this;
       sendAjax("/kefu/chartStatistics", "get", {}, function (data) {

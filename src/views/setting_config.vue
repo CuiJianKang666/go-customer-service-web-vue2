@@ -52,6 +52,20 @@ export default {
       configList: [],
     }
   },
+  methods:{
+    setConfigItem(key, value) {
+      let _this = this;
+      sendAjax("/config", "POST", {key: key, value: value}, function (result) {
+        sendAjax("/configs", "get", {}, function (result) {
+          _this.configList = result;
+          _this.$message({
+            message: "配置成功！",
+            type: 'success'
+          });
+        });
+      });
+    },
+  },
   created() {
     let _this = this;
     sendAjax("/configs", "get", {}, function (result) {

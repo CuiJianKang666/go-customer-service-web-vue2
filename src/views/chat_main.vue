@@ -1,4 +1,3 @@
-
 <style>
 @import "/public/static/css/common.css?v=dgftr65ujhfg";
 @import "/public/static/css/icon/iconfont.css?v=fgjlgfda";
@@ -246,7 +245,7 @@ html, body {
         </div>
         <div class="replyBox">
           <div class="chatRightTitle">快捷回复
-            <a href="javascript:void(0);" @click="replyGroupDialog = true">+添加分组</a>
+            <a href="javascript:void(0);" @click="replyGroupDialog = true;groupName=''">+添加分组</a>
           </div>
           <el-input placeholder="选中文字自动搜索" v-model="replySearch" class="replySearch"
                     @keyup.enter="searchReply">
@@ -272,7 +271,7 @@ html, body {
               </el-collapse-item>
             </el-collapse>
             <el-collapse v-show="replySearchList.length==0">
-              <el-collapse-item v-for="reply in replys" :key="reply.group_id" :title="reply.group_name"
+              <el-collapse-item v-for="(reply, index) in replys" :key="reply.group_id" :title="reply.group_name"
                                 :name="reply.group_id">
                 <template slot="title">
                   <i class="el-icon-s-order"></i>&nbsp;{{ reply.group_name }}
@@ -289,6 +288,7 @@ html, body {
                         class="header-icon el-icon-document"></i> {{ item.item_name }}
                     </div>
                   </el-popover>
+
                   <el-button
                       @click="editReplyContent('no',item.item_id,item.item_name,item.item_content)"
                       type="text">编辑
@@ -296,18 +296,20 @@ html, body {
                   <el-button @click="deleteReplyContent(item.item_id)" type="text">删除</el-button>
                 </div>
                 <el-button
-                    @click="replyContentDialog=true;groupName=reply.group_name;groupId=reply.group_id"
+                    @click="replyContentDialog=true;groupName=reply.group_name;groupId=reply.group_id;replyTitle='';replyContent=''"
                     type="text">+添加回复内容
                 </el-button>
+                <el-button @click="showUpdateReplyGroupDialog(reply.group_name)" type="text">-修改组名</el-button>
+
                 <el-popover
                     placement="top"
                     width="100"
-                    v-model="visible">
+                    v-model="delVisible[index]">
                   <p>确定删除吗？</p>
                   <div style="text-align: right; margin: 0">
-                    <el-button size="mini" type="text" @click="visible = false">取消</el-button>
+                    <el-button size="mini" type="text" @click="cancleDelete(index)">取消</el-button>
                     <el-button type="primary" size="mini"
-                               @click="visible = false;deleteReplyGroup(reply.group_id)">确定
+                               @click="cancleDelete(index);deleteReplyGroup(reply.group_id)">确定
                     </el-button>
                   </div>
                   <el-button slot="reference" type="text">-删除组</el-button>
@@ -404,6 +406,18 @@ html, body {
               </span>
     </el-dialog>
     <!--//回复内容-->
+    <el-dialog
+        title="修改组名"
+        :visible.sync="updateDialog"
+        width="30%"
+        top="0"
+    >
+      <el-input style="margin-bottom: 10px;" placeholder="新组名" v-model="newGroupName"></el-input>
+      <span slot="footer" class="dialog-footer">
+                <el-button @click="updateReplyGroup()">保 存</el-button>
+                <el-button @click="updateDialog = false">取 消</el-button>
+              </span>
+    </el-dialog>
   </div>
 </template>
 <script>
@@ -419,8 +433,11 @@ import {
 export default {
   data() {
     return {
+      updateDialog: false,
+      newGroupName: "",
+      oldGroupName: "",
       currentGuest: "",
-      visible: false,
+      delVisible: [],
       chatTitleType: "info",
       fullscreenLoading: true,
       leftTabActive: "first",
@@ -475,6 +492,9 @@ export default {
     }
   },
   methods: {
+    cancleDelete(index){
+      this.$set(this.delVisible, index, false);
+    },
     sendKefuOnline() {
       let mes = {}
       mes.type = "kfOnline";
@@ -863,7 +883,7 @@ export default {
             _this.chatTitleType = "success";
             _this.visitorExtra = [];
             if (r.extra != "") {
-              if (r.extra!="{"){
+              if (r.extra != "{") {
                 extra = JSON.parse(b64ToUtf8(r.extra));
               }
               if (typeof extra == "string") {
@@ -918,6 +938,7 @@ export default {
         this.getVisitorPage(1);
       }
       if (tab.name == "blackList") {
+        this.getIpblacks()
       }
     },
     //所有访客分页展示
@@ -935,16 +956,16 @@ export default {
           "token": localStorage.getItem("token")
         },
         success: function (data) {
-          if (data.result.list != null) {
-            _this.visitors = data.result.list;
-            _this.visitorCount = data.result.count;
-            _this.visitorPageSize = data.result.pagesize;
-          }
           if (data.code != 200) {
             _this.$message({
               message: data.msg,
               type: 'error'
             });
+          }
+          if (data.result.list != null) {
+            _this.visitors = data.result.list;
+            _this.visitorCount = data.result.count;
+            _this.visitorPageSize = data.result.pagesize;
           }
         }
       });
@@ -1182,14 +1203,38 @@ export default {
         _this.replys = result;
       });
     },
-    //删除回复
+    //修改dialog
+    showUpdateReplyGroupDialog(group_name) {
+      this.updateDialog = true
+      this.oldGroupName = group_name
+      this.newGroupName = group_name
+    },
+    //修改组名
+    updateReplyGroup() {
+      this.updateDialog = false
+      let _this = this
+      var data = {
+        group_name: this.oldGroupName,
+        new_group_name: this.newGroupName
+      }
+      this.sendAjax("/reply", "post", data, function (result) {
+        if (result.code==200){
+          _this.$message({
+            message: result.msg,
+            type: 'success'
+          });
+        }
+        _this.getReplys();
+      });
+    },
+    //删除回复组
     deleteReplyGroup(id) {
       var _this = this;
       this.sendAjax("/reply?id=" + id, "delete", {}, function (result) {
         _this.getReplys();
       });
     },
-    //删除回复
+    //删除回复内容
     deleteReplyContent(id) {
       var _this = this;
       this.sendAjax("/reply_content?id=" + id, "delete", {}, function (result) {
